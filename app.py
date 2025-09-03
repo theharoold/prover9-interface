@@ -1,6 +1,7 @@
 from flask import Flask, request, redirect, url_for, render_template, flash
 import os
 import subprocess
+import uuid
 
 app = Flask(__name__)
 app.secret_key = "supersecret"
@@ -56,17 +57,53 @@ def delete_file(filename):
     return redirect(url_for("index"))
 
 
+def expand_includes(filepath, visited=None):
+    """Recursively replace include(...) lines with actual file contents."""
+    if visited is None:
+        visited = set()
+    content_lines = []
+    with open(filepath) as f:
+        for line in f:
+            stripped = line.strip()
+            if stripped.startswith("include(") and stripped.endswith(")."):
+                included_file = stripped[len("include("):-2].strip('"')
+                if included_file in visited:
+                    continue  # avoid circular includes
+                included_path = os.path.join(FILES_DIR, included_file)
+                if os.path.exists(included_path):
+                    visited.add(included_file)
+                    content_lines.extend(expand_includes(included_path, visited))
+                else:
+                    content_lines.append(f"% File {included_file} not found\n")
+            else:
+                content_lines.append(line)
+    return content_lines
+
+
 @app.route("/run/<filename>")
 def run_file(filename):
     filepath = os.path.join(FILES_DIR, filename)
+    tmp_file = os.path.join(FILES_DIR, f"tmp_{uuid.uuid4().hex}.p9")
+
     try:
+        # Expand includes and write to temporary file
+        expanded_content = expand_includes(filepath)
+        with open(tmp_file, "w") as f:
+            f.writelines(expanded_content)
+
+        # Run Prover9 on tmp file
         result = subprocess.run(
-            ["prover9", "-f", filepath],
+            ["prover9", "-f", tmp_file],
             capture_output=True, text=True, timeout=30
         )
         output = result.stdout + "\n" + result.stderr
     except Exception as e:
         output = str(e)
+    finally:
+        # Clean up temporary file
+        if os.path.exists(tmp_file):
+            os.remove(tmp_file)
+
     return render_template("run.html", filename=filename, output=output)
 
 
