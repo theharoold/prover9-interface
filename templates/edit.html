@@ -1,0 +1,35 @@
+{% extends "base.html" %}
+{% block content %}
+<h3>Edit {{ filename }}</h3>
+<form method="post">
+  <div class="mb-3">
+    <label>Insert Include</label>
+    <select id="includeDropdown" class="form-select">
+      <option value="">-- Select file to include --</option>
+      {% for f in files %}
+      <option value="{{ f }}">{{ f }}</option>
+      {% endfor %}
+    </select>
+  </div>
+  <div class="mb-3">
+    <textarea id="editor" class="form-control" name="content" rows="20">{{ content }}</textarea>
+  </div>
+  <button class="btn btn-success">💾 Save</button>
+  <a href="{{ url_for('index') }}" class="btn btn-secondary">Cancel</a>
+</form>
+
+<script>
+document.getElementById("includeDropdown").addEventListener("change", function() {
+    let file = this.value;
+    if (file) {
+        let textarea = document.getElementById("editor");
+        let insertText = 'include("' + file + '").\n';
+        let start = textarea.selectionStart;
+        let end = textarea.selectionEnd;
+        let text = textarea.value;
+        textarea.value = text.substring(0, start) + insertText + text.substring(end);
+        textarea.selectionStart = textarea.selectionEnd = start + insertText.length;
+    }
+});
+</script>
+{% endblock %}

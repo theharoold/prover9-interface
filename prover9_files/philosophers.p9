@@ -1,0 +1,10 @@
+% Additional facts about philosophers
+philosopher(socrates).
+philosopher(plato).
+philosopher(aristotle).
+% Goal: prove all philosophers are mortal
+formulas(goals).
+    mortal(socrates).
+    mortal(plato).
+    mortal(aristotle).
+end_of_list.

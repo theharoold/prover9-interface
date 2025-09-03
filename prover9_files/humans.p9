@@ -1,0 +1,7 @@
+% List of humans
+human(socrates).
+human(plato).
+human(aristotle).
+
+% All humans are mortal
+all x (human(x) -> mortal(x)).

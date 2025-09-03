@@ -1,0 +1,10 @@
+% All humans are mortal
+all x (human(x) -> mortal(x)).
+
+% Socrates is human
+human(socrates).
+
+% Goal: prove Socrates is mortal
+formulas(goals).
+    mortal(socrates).
+end_of_list.

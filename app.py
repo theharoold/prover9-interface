@@ -1,40 +1,74 @@
-from flask import Flask, request, render_template_string
+from flask import Flask, request, redirect, url_for, render_template, flash
+import os
 import subprocess
 
 app = Flask(__name__)
+app.secret_key = "supersecret"
+FILES_DIR = "./prover9_files"
+os.makedirs(FILES_DIR, exist_ok=True)
 
-HTML_PAGE = """
-<!doctype html>
-<title>Prover9 Online</title>
-<h1>Enter axioms (Prover9 format)</h1>
-<form method=post>
-  <textarea name=axioms rows=15 cols=80></textarea><br>
-  <input type=submit value="Run Prover9">
-</form>
-{% if output %}
-<h2>Output:</h2>
-<pre>{{ output }}</pre>
-{% endif %}
-"""
 
-@app.route("/", methods=["GET", "POST"])
+@app.route("/")
 def index():
-    output = None
+    files = [f for f in os.listdir(FILES_DIR) if f.endswith(".p9")]
+    return render_template("index.html", files=files)
+
+
+@app.route("/new", methods=["GET", "POST"])
+def new_file():
+    files = [f for f in os.listdir(FILES_DIR) if f.endswith(".p9")]
+
     if request.method == "POST":
-        axioms = request.form["axioms"]
-        with open("./input.p9", "w") as f:
-            f.write(axioms)
-        try:
-            result = subprocess.run(
-                ["prover9", "-f", "input.p9"],
-                capture_output=True, text=True, timeout=30
-            )
-            output = result.stdout + "\n" + result.stderr
-            print(0, output)
-        except Exception as e:
-            print(1, str(e))
-            output = str(e)
-    return render_template_string(HTML_PAGE, output=output)
+        filename = request.form["filename"].strip()
+        if not filename.endswith(".p9"):
+            filename += ".p9"
+        filepath = os.path.join(FILES_DIR, filename)
+        if os.path.exists(filepath):
+            flash("File already exists!")
+        else:
+            with open(filepath, "w") as f:
+                f.write(request.form["content"])
+            flash(f"File {filename} created!")
+        return redirect(url_for("index"))
+    return render_template("new.html", files=files)
+
+
+@app.route("/edit/<filename>", methods=["GET", "POST"])
+def edit_file(filename):
+    filepath = os.path.join(FILES_DIR, filename)
+    if request.method == "POST":
+        with open(filepath, "w") as f:
+            f.write(request.form["content"])
+        flash(f"File {filename} updated!")
+        return redirect(url_for("index"))
+    with open(filepath) as f:
+        content_text = f.read()
+    files = [f for f in os.listdir(FILES_DIR) if f.endswith(".p9") and f != filename]
+    return render_template("edit.html", filename=filename, content=content_text, files=files)
+
+
+@app.route("/delete/<filename>")
+def delete_file(filename):
+    filepath = os.path.join(FILES_DIR, filename)
+    if os.path.exists(filepath):
+        os.remove(filepath)
+        flash(f"Deleted {filename}")
+    return redirect(url_for("index"))
+
+
+@app.route("/run/<filename>")
+def run_file(filename):
+    filepath = os.path.join(FILES_DIR, filename)
+    try:
+        result = subprocess.run(
+            ["prover9", "-f", filepath],
+            capture_output=True, text=True, timeout=30
+        )
+        output = result.stdout + "\n" + result.stderr
+    except Exception as e:
+        output = str(e)
+    return render_template("run.html", filename=filename, output=output)
+
 
 if __name__ == "__main__":
-    app.run(host="0.0.0.0", port=7654)
+    app.run(host="0.0.0.0", port=7654, debug=True)
